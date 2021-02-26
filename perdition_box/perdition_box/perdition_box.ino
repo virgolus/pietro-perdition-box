@@ -194,7 +194,7 @@ void startTalpaGame() {
   ingame = true;
 
   // Generate random sequence
-  int rnd = random(0,4);
+  int rnd = random(0, 4);
   whereIs = rnd;
   Serial.print("whereIs: ");
   Serial.println(whereIs);
@@ -251,29 +251,21 @@ void talpaInput() { //Function for allowing user input and checking input agains
 
 void startTalpaContinuousGame() {
 
-  Serial.println("TALPA GAME");
+  Serial.println("TALPA CONTINUOUS GAME");
 
   ingame = true;
 
-  // Generate random sequence
-  int rnd = random(0,4);
-  whereIs = rnd;
-  Serial.print("whereIs: ");
-  Serial.println(whereIs);
-
-  drawSmile(3 - rnd);
-  // Buzzer&notes
-  int note = notes[rnd];
-  buzz(note, 500);
-
-  clearMatrix();
-
-  talpaContinuousInput();
-}
-
-void talpaContinuousInput() { //Function for allowing user input and checking input against the generated array
-
   while (ingame) {
+    // Generate random sequence
+    int rnd = random(0, 4);
+    whereIs = rnd;
+    Serial.print("whereIs: ");
+    Serial.println(whereIs);
+
+    drawSmile(3 - rnd);
+    // Buzzer&notes
+    int note = notes[rnd];
+    buzz(note, 500);
 
     checkGameSwitch();
 
@@ -296,207 +288,206 @@ void talpaContinuousInput() { //Function for allowing user input and checking in
       }
 
       digitalWrite(ledpin[btnNum], HIGH);
-      buzz(randomNotesArray[seq], 200);
-      delay(300);
+      buzz(randomNotesArray[seq], 100);
       digitalWrite(ledpin[btnNum], LOW);
 
-      if ((whereIs) == btnNum) { //Checks value input by user and checks it against
-
-        break;
-      } else {
-        lose();
-      }
-
+      clearMatrixPart(3 - btnNum);
+    } else {
+      delay(1000);
     }
   }
 }
 
-void checkGameSwitch() {
+  void checkGameSwitch() {
 
-  if (digitalRead(changeGamePin) == LOW) {
+    if (digitalRead(changeGamePin) == LOW) {
       ingame = false;
-    if (currentGameIndex == 1) {
-      currentGameIndex = 0;
-    } else if (currentGameIndex == 0) {
-      currentGameIndex = 1;
+      if (currentGameIndex == 1) {
+        currentGameIndex = 0;
+      } else if (currentGameIndex == 0) {
+        currentGameIndex = 1;
+      }
     }
   }
-}
 
-void win() { //Function used if the player fails to match the sequence
-  resetVars();
+  void win() { //Function used if the player fails to match the sequence
+    resetVars();
 
-  draw4Smiles();
+    draw4Smiles();
 
-  for (int x = 0; x < 8; x++) {
-    for (int led = 0; led < 4; led++) {
-      digitalWrite(ledpin[led], HIGH);
+    for (int x = 0; x < 8; x++) {
+      for (int led = 0; led < 4; led++) {
+        digitalWrite(ledpin[led], HIGH);
 
-      buzz(NOTE_D4, 50);
+        buzz(NOTE_D4, 50);
 
-      digitalWrite(ledpin[led], LOW);
+        digitalWrite(ledpin[led], LOW);
+      }
+      for (int led = 4; led > 0; led--) {
+        digitalWrite(ledpin[led], HIGH);
+
+        buzz(NOTE_E4, 50);
+
+        digitalWrite(ledpin[led], LOW);
+      }
+      x++;
     }
-    for (int led = 4; led > 0; led--) {
-      digitalWrite(ledpin[led], HIGH);
 
-      buzz(NOTE_E4, 50);
+    delay(2000);
 
-      digitalWrite(ledpin[led], LOW);
-    }
-    x++;
-  }
-
-  delay(2000);
-
-  clearMatrix();
-}
-
-void lose() { //Function used if the player fails to match the sequence
-  resetVars();
-
-  for (int y = 0; y < 3; y++)
-  { //Flashes lights for failure
-    drawError();
-    buzz(NOTE_C4, 300);
-    //delay(300);
     clearMatrix();
-    delay(100);
   }
 
-  delay(2000);
-}
+  void lose() { //Function used if the player fails to match the sequence
+    resetVars();
 
-void resetVars() {
-  ingame = false;
-  seq = 0;
-  memset(inputArray, 0, sizeof(inputArray));
-  memset(randomArray, 0, sizeof(randomArray));
-}
+    for (int y = 0; y < 3; y++)
+    { //Flashes lights for failure
+      drawError();
+      buzz(NOTE_C4, 300);
+      //delay(300);
+      clearMatrix();
+      delay(100);
+    }
 
-// ***** LED MATRIX *****
-void putByte(byte data)
-{
-  byte i = 8;
-  byte mask;
-  while (i > 0)
+    delay(2000);
+  }
+
+  void resetVars() {
+    ingame = false;
+    seq = 0;
+    memset(inputArray, 0, sizeof(inputArray));
+    memset(randomArray, 0, sizeof(randomArray));
+  }
+
+  // ***** LED MATRIX *****
+  void putByte(byte data)
   {
-    mask = 0x01 << (i - 1);        // get bitmask
-    digitalWrite( CLK_PIN, LOW);   // tick
-    if (data & mask)               // choose bit
-      digitalWrite(DIN_PIN, HIGH); // send 1
-    else
-      digitalWrite(DIN_PIN, LOW);  // send 0
-    digitalWrite(CLK_PIN, HIGH);   // tock
-    --i;                           // move to lesser bit
+    byte i = 8;
+    byte mask;
+    while (i > 0)
+    {
+      mask = 0x01 << (i - 1);        // get bitmask
+      digitalWrite( CLK_PIN, LOW);   // tick
+      if (data & mask)               // choose bit
+        digitalWrite(DIN_PIN, HIGH); // send 1
+      else
+        digitalWrite(DIN_PIN, LOW);  // send 0
+      digitalWrite(CLK_PIN, HIGH);   // tock
+      --i;                           // move to lesser bit
+    }
   }
-}
 
-void drawInitGameMatrix() {
-  Serial.println("INIT MATRIX");
-  for (int l = 0; l < 8; l++) {
-    for (int dev = 3; dev >= 0; dev--) {
-      for (int c = 0; c < 8; c++) {
-        lc.setLed(dev, l, c, true); // turns on LED at col, row
-        delay(3);
-        if (l > 0) {
-          lc.setLed(dev, l - 1, c, false); // turns on LED at col, row
+  void drawInitGameMatrix() {
+    Serial.println("INIT MATRIX");
+    for (int l = 0; l < 8; l++) {
+      for (int dev = 3; dev >= 0; dev--) {
+        for (int c = 0; c < 8; c++) {
+          lc.setLed(dev, l, c, true); // turns on LED at col, row
+          delay(3);
+          if (l > 0) {
+            lc.setLed(dev, l - 1, c, false); // turns on LED at col, row
+          }
         }
       }
     }
+
+    clearMatrix();
   }
 
-  clearMatrix();
-}
+  void drawError() {
 
-void drawError() {
+    for (int dev = 0; dev < 4; dev++)
+    {
+      lc.setLed(dev, 1, 1, true); // turns on LED at col, row
+      lc.setLed(dev, 2, 2, true); // turns on LED at col, row
+      lc.setLed(dev, 3, 3, true); // turns on LED at col, row
+      lc.setLed(dev, 4, 4, true); // turns on LED at col, row
+      lc.setLed(dev, 5, 5, true); // turns on LED at col, row
+      lc.setLed(dev, 6, 6, true); // turns on LED at col, row
 
-  for (int dev = 0; dev < 4; dev++)
-  {
+      lc.setLed(dev, 1, 6, true); // turns on LED at col, row
+      lc.setLed(dev, 2, 5, true); // turns on LED at col, row
+      lc.setLed(dev, 3, 4, true); // turns on LED at col, row
+      lc.setLed(dev, 4, 3, true); // turns on LED at col, row
+      lc.setLed(dev, 5, 2, true); // turns on LED at col, row
+      lc.setLed(dev, 6, 1, true); // turns on LED at col, row
+    }
+  }
+
+  void draw4Smiles() {
+    for (int dev = 0; dev < 4; dev++)
+    {
+      drawSmile(dev);
+    }
+  }
+
+  void drawSmile(int dev) {
+    lc.setLed(dev, 0, 2, true); // turns on LED at col, row
+    lc.setLed(dev, 0, 3, true); // turns on LED at col, row
+    lc.setLed(dev, 0, 4, true); // turns on LED at col, row
+    lc.setLed(dev, 0, 5, true); // turns on LED at col, row
+
     lc.setLed(dev, 1, 1, true); // turns on LED at col, row
+    lc.setLed(dev, 1, 6, true); // turns on LED at col, row
+
+    lc.setLed(dev, 2, 0, true); // turns on LED at col, row
+    lc.setLed(dev, 2, 7, true); // turns on LED at col, row
     lc.setLed(dev, 2, 2, true); // turns on LED at col, row
-    lc.setLed(dev, 3, 3, true); // turns on LED at col, row
-    lc.setLed(dev, 4, 4, true); // turns on LED at col, row
-    lc.setLed(dev, 5, 5, true); // turns on LED at col, row
+    lc.setLed(dev, 2, 5, true); // turns on LED at col, row
+
+    lc.setLed(dev, 3, 0, true); // turns on LED at col, row
+    lc.setLed(dev, 3, 7, true); // turns on LED at col, row
+
+    lc.setLed(dev, 4, 0, true); // turns on LED at col, row
+    lc.setLed(dev, 4, 7, true); // turns on LED at col, row
+    lc.setLed(dev, 4, 2, true); // turns on LED at col, row
+    lc.setLed(dev, 4, 5, true); // turns on LED at col, row
+
+    lc.setLed(dev, 5, 0, true); // turns on LED at col, row
+    lc.setLed(dev, 5, 3, true); // turns on LED at col, row
+    lc.setLed(dev, 5, 4, true); // turns on LED at col, row
+    lc.setLed(dev, 5, 7, true); // turns on LED at col, row
+
+    lc.setLed(dev, 6, 1, true); // turns on LED at col, row
     lc.setLed(dev, 6, 6, true); // turns on LED at col, row
 
-    lc.setLed(dev, 1, 6, true); // turns on LED at col, row
-    lc.setLed(dev, 2, 5, true); // turns on LED at col, row
-    lc.setLed(dev, 3, 4, true); // turns on LED at col, row
-    lc.setLed(dev, 4, 3, true); // turns on LED at col, row
-    lc.setLed(dev, 5, 2, true); // turns on LED at col, row
-    lc.setLed(dev, 6, 1, true); // turns on LED at col, row
+    lc.setLed(dev, 7, 2, true); // turns on LED at col, row
+    lc.setLed(dev, 7, 3, true); // turns on LED at col, row
+    lc.setLed(dev, 7, 4, true); // turns on LED at col, row
+    lc.setLed(dev, 7, 5, true); // turns on LED at col, row
   }
-}
 
-void draw4Smiles() {
-  for (int dev = 0; dev < 4; dev++)
-  {
-    drawSmile(dev);
+  void clearMatrix() {
+    lc.clearDisplay(0);// clear screen
+    lc.clearDisplay(1);// clear screen
+    lc.clearDisplay(2);// clear screen
+    lc.clearDisplay(3);// clear screen
   }
-}
 
-void drawSmile(int dev) {
-  lc.setLed(dev, 0, 2, true); // turns on LED at col, row
-  lc.setLed(dev, 0, 3, true); // turns on LED at col, row
-  lc.setLed(dev, 0, 4, true); // turns on LED at col, row
-  lc.setLed(dev, 0, 5, true); // turns on LED at col, row
+  void clearMatrixPart(int dev) {
+    lc.clearDisplay(dev);// clear screen
+  }
 
-  lc.setLed(dev, 1, 1, true); // turns on LED at col, row
-  lc.setLed(dev, 1, 6, true); // turns on LED at col, row
+  void initMatrix() {
+    // ***** LED MATRIX *****
+    lc.shutdown(0, false); // turn off power saving, enables display
+    lc.setIntensity(0, 1); // sets brightness (0~15 possible values)
+    lc.clearDisplay(0);// clear screen
+    lc.shutdown(1, false); // turn off power saving, enables display
+    lc.setIntensity(1, 1); // sets brightness (0~15 possible values)
+    lc.clearDisplay(1);// clear screen
+    lc.shutdown(2, false); // turn off power saving, enables display
+    lc.setIntensity(2, 1); // sets brightness (0~15 possible values)
+    lc.clearDisplay(2);// clear screen
+    lc.shutdown(3, false); // turn off power saving, enables display
+    lc.setIntensity(3, 1); // sets brightness (0~15 possible values)
+    lc.clearDisplay(3);// clear screen
+    // ***** LED MATRIX *****
+  }
 
-  lc.setLed(dev, 2, 0, true); // turns on LED at col, row
-  lc.setLed(dev, 2, 7, true); // turns on LED at col, row
-  lc.setLed(dev, 2, 2, true); // turns on LED at col, row
-  lc.setLed(dev, 2, 5, true); // turns on LED at col, row
-
-  lc.setLed(dev, 3, 0, true); // turns on LED at col, row
-  lc.setLed(dev, 3, 7, true); // turns on LED at col, row
-
-  lc.setLed(dev, 4, 0, true); // turns on LED at col, row
-  lc.setLed(dev, 4, 7, true); // turns on LED at col, row
-  lc.setLed(dev, 4, 2, true); // turns on LED at col, row
-  lc.setLed(dev, 4, 5, true); // turns on LED at col, row
-
-  lc.setLed(dev, 5, 0, true); // turns on LED at col, row
-  lc.setLed(dev, 5, 3, true); // turns on LED at col, row
-  lc.setLed(dev, 5, 4, true); // turns on LED at col, row
-  lc.setLed(dev, 5, 7, true); // turns on LED at col, row
-
-  lc.setLed(dev, 6, 1, true); // turns on LED at col, row
-  lc.setLed(dev, 6, 6, true); // turns on LED at col, row
-
-  lc.setLed(dev, 7, 2, true); // turns on LED at col, row
-  lc.setLed(dev, 7, 3, true); // turns on LED at col, row
-  lc.setLed(dev, 7, 4, true); // turns on LED at col, row
-  lc.setLed(dev, 7, 5, true); // turns on LED at col, row
-}
-
-void clearMatrix() {
-  lc.clearDisplay(0);// clear screen
-  lc.clearDisplay(1);// clear screen
-  lc.clearDisplay(2);// clear screen
-  lc.clearDisplay(3);// clear screen
-}
-
-void initMatrix() {
-  // ***** LED MATRIX *****
-  lc.shutdown(0, false); // turn off power saving, enables display
-  lc.setIntensity(0, 1); // sets brightness (0~15 possible values)
-  lc.clearDisplay(0);// clear screen
-  lc.shutdown(1, false); // turn off power saving, enables display
-  lc.setIntensity(1, 1); // sets brightness (0~15 possible values)
-  lc.clearDisplay(1);// clear screen
-  lc.shutdown(2, false); // turn off power saving, enables display
-  lc.setIntensity(2, 1); // sets brightness (0~15 possible values)
-  lc.clearDisplay(2);// clear screen
-  lc.shutdown(3, false); // turn off power saving, enables display
-  lc.setIntensity(3, 1); // sets brightness (0~15 possible values)
-  lc.clearDisplay(3);// clear screen
-  // ***** LED MATRIX *****
-}
-
-void buzz(unsigned int nota, long durata) {
-  tone(buzzPin, nota, durata);
-  delay(durata);
-  noTone(buzzPin);
-}
+  void buzz(unsigned int nota, long durata) {
+    tone(buzzPin, nota, durata);
+    delay(durata);
+    noTone(buzzPin);
+  }
