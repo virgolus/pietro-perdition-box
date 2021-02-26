@@ -3,7 +3,7 @@
 #include "LedControl.h" //  need the library
 #include "SoftwareSerial.h"
 
-int games[] = {1, 2};
+int games[] = {1, 2, 3};
 int currentGameIndex = 0;
 
 int changeGamePin = 4;
@@ -86,7 +86,7 @@ void setup()
   }
 
   // changeGame
-  pinMode(changeGamePin, INPUT);
+  pinMode(changeGamePin, INPUT_PULLUP);
 
   randomSeed(analogRead(0)); //Added to generate "more randomness" with the randomArray for the output function
 
@@ -102,6 +102,8 @@ void loop()
     startMemoryGame();
   } else if (games[currentGameIndex] == 2) {
     startTalpaGame();
+  } else if (games[currentGameIndex] == 3) {
+    startTalpaContinuousGame();
   }
 }
 
@@ -192,12 +194,12 @@ void startTalpaGame() {
   ingame = true;
 
   // Generate random sequence
-  int rnd = random(4);
+  int rnd = random(0,4);
   whereIs = rnd;
   Serial.print("whereIs: ");
   Serial.println(whereIs);
 
-  drawSmile(4 - rnd);
+  drawSmile(3 - rnd);
   // Buzzer&notes
   int note = notes[rnd];
   buzz(note, 500);
@@ -233,9 +235,72 @@ void talpaInput() { //Function for allowing user input and checking input agains
 
       digitalWrite(ledpin[btnNum], HIGH);
       buzz(randomNotesArray[seq], 200);
+      delay(300);
       digitalWrite(ledpin[btnNum], LOW);
 
-      if ((whereIs - 1) == btnNum) { //Checks value input by user and checks it against
+      if ((whereIs) == btnNum) { //Checks value input by user and checks it against
+
+        break;
+      } else {
+        lose();
+      }
+
+    }
+  }
+}
+
+void startTalpaContinuousGame() {
+
+  Serial.println("TALPA GAME");
+
+  ingame = true;
+
+  // Generate random sequence
+  int rnd = random(0,4);
+  whereIs = rnd;
+  Serial.print("whereIs: ");
+  Serial.println(whereIs);
+
+  drawSmile(3 - rnd);
+  // Buzzer&notes
+  int note = notes[rnd];
+  buzz(note, 500);
+
+  clearMatrix();
+
+  talpaContinuousInput();
+}
+
+void talpaContinuousInput() { //Function for allowing user input and checking input against the generated array
+
+  while (ingame) {
+
+    checkGameSwitch();
+
+    int btnVal = analogRead(A0);
+
+    if (btnVal > 10)
+    { //Checking for button push
+      int btnNum;
+
+      if (btnVal > 750 && btnVal < 770) {
+        btnNum = 0;
+      } else if (btnVal > 500 && btnVal < 520) {
+        btnNum = 1;
+      } else if (btnVal > 160 && btnVal < 170) {
+        btnNum = 2;
+      } else if (btnVal > 80 && btnVal < 100) {
+        btnNum = 3;
+      } else {
+        continue;
+      }
+
+      digitalWrite(ledpin[btnNum], HIGH);
+      buzz(randomNotesArray[seq], 200);
+      delay(300);
+      digitalWrite(ledpin[btnNum], LOW);
+
+      if ((whereIs) == btnNum) { //Checks value input by user and checks it against
 
         break;
       } else {
@@ -247,7 +312,9 @@ void talpaInput() { //Function for allowing user input and checking input agains
 }
 
 void checkGameSwitch() {
+
   if (digitalRead(changeGamePin) == LOW) {
+      ingame = false;
     if (currentGameIndex == 1) {
       currentGameIndex = 0;
     } else if (currentGameIndex == 0) {
@@ -268,7 +335,6 @@ void win() { //Function used if the player fails to match the sequence
       buzz(NOTE_D4, 50);
 
       digitalWrite(ledpin[led], LOW);
-
     }
     for (int led = 4; led > 0; led--) {
       digitalWrite(ledpin[led], HIGH);
@@ -276,7 +342,6 @@ void win() { //Function used if the player fails to match the sequence
       buzz(NOTE_E4, 50);
 
       digitalWrite(ledpin[led], LOW);
-
     }
     x++;
   }
