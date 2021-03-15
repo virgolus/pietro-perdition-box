@@ -2,12 +2,17 @@
 #include "pitches.h"
 #include "LedControl.h" //  need the library
 #include "SoftwareSerial.h"
+#include <avr/sleep.h>//this AVR library contains the methods that controls the sleep modes
 
+// General vars
 int games[] = {1, 2, 3};
 int currentGameIndex = 0;
-bool gameChanged = true;
-
-int changeGamePin = 4;
+unsigned long lastButtonPressMillis = millis();
+unsigned long standbyWaitMillis = 60000;
+unsigned long loseWaitMillis = 10000;
+int changeGamePin = 3;
+boolean ingame = false;
+boolean gameChanged = true;
 
 // ***** MEMORY *****
 int button[] = {768, 510, 164, 91}; //The four button input pins
@@ -18,7 +23,6 @@ int randomArray[4];
 int randomNotesArray[4];
 int inputArray[4];
 int btn_down_duration = 600;
-boolean ingame = true;
 int seq = 0;
 // ***** MEMORY *****
 
@@ -48,15 +52,17 @@ void setup()
     pinMode(ledpin[x], OUTPUT);
   }
 
-  // changeGame
-  pinMode(changeGamePin, INPUT_PULLUP);
-
   randomSeed(analogRead(0)); //Added to generate "more randomness" with the randomArray for the output function
 
   initMatrix();
   delay(500);
   drawInitGameMatrix();
   delay(2000);
+
+  // Change game button
+    // changeGame
+  pinMode(changeGamePin, INPUT_PULLUP);
+  attachInterrupt(1, gameSwitch, CHANGE); 
 }
 
 void loop()
@@ -76,7 +82,6 @@ void startMemoryGame() {
   if (gameChanged) {
     drawInitMemory();
     delay(1000);
-    gameChanged = false;
   }
   ingame = true;
 
@@ -87,7 +92,7 @@ void startMemoryGame() {
     int rnd = random(4);
     randomArray[y] = rnd;
     Serial.print(randomArray[y]);
-    Serial.println("");
+
     digitalWrite(ledpin[rnd], HIGH);
 
     // Buzzer&notes
@@ -104,23 +109,27 @@ void startMemoryGame() {
 }
 
 void memoryInput() { //Function for allowing user input and checking input against the generated array
-
+  
   while (ingame) {
 
-    checkGameSwitch();
+    checkStandbyDelay();
 
     int btnVal = analogRead(A0);
 
-    if (btnVal > 10)
-    { //Checking for button push
+    if (btnVal > 25)
+    { 
+      //Checking for button push
       int btnNum = getButtonNumber(btnVal);
 
       if (btnNum == 999) {
         continue;
       }
 
+
       Serial.print("button pressed: ");
       Serial.println(btnNum);
+
+      lastButtonPressMillis = millis();
 
       inputArray[seq] = btnNum;
 
@@ -130,7 +139,6 @@ void memoryInput() { //Function for allowing user input and checking input again
 
         // led up and buzzer
         digitalWrite(ledpin[btnNum], HIGH);
-        //delay(btn_down_duration);
         buzz(randomNotesArray[seq], btn_down_duration);
         digitalWrite(ledpin[btnNum], LOW);
 
@@ -148,7 +156,6 @@ void startTalpaGame() {
   Serial.println("TALPA GAME");
   if (gameChanged) {
     drawInitTalpa();
-    gameChanged = false;
     delay(1000);
   }
   ingame = true;
@@ -171,11 +178,11 @@ void talpaInput() { //Function for allowing user input and checking input agains
 
   while (ingame) {
 
-    checkGameSwitch();
+    checkStandbyDelay();
 
     int btnVal = analogRead(A0);
 
-    if (btnVal > 10)
+    if (btnVal > 25)
     { //Checking for button push
       int btnNum = getButtonNumber(btnVal);
 
@@ -185,7 +192,9 @@ void talpaInput() { //Function for allowing user input and checking input agains
 
       Serial.print("button pressed: ");
       Serial.println(btnNum);
-
+      
+      lastButtonPressMillis = millis();
+  
       digitalWrite(ledpin[btnNum], HIGH);
       buzz(randomNotesArray[seq], 200);
       delay(300);
@@ -217,8 +226,6 @@ void startTalpaContinuousGame() {
     int note = notes[rnd];
     buzz(note, 500);
 
-    checkGameSwitch();
-
     int btnVal = analogRead(A0);
 
     if (btnVal > 10)
@@ -243,18 +250,43 @@ void startTalpaContinuousGame() {
   }
 }
 
-void checkGameSwitch() {
-  if (digitalRead(changeGamePin) == LOW) {
-    
-    Serial.print("GAME CHANGED!");
-    gameChanged = true;
+void gameSwitch() {
+  Serial.println("GAME SWITCH!!!!");
     ingame = false;
+    gameChanged = true;
+    lastButtonPressMillis = millis();
     if (currentGameIndex == 1) {
       currentGameIndex = 0;
     } else if (currentGameIndex == 0) {
       currentGameIndex = 1;
     }
-  }
+}
+
+// TODO: If no activity for standbyWaitMillis, power off
+void checkIfPowerDown() {
+  long currentMillis = millis();
+
+ if (currentMillis - lastButtonPressMillis >= standbyWaitMillis) {
+  
+    sleep_enable();//Enabling sleep mode
+    //attachInterrupt(0, wakeUp, LOW);//attaching a interrupt to pin d2
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);//Setting the sleep mode, in our case full sleep
+    digitalWrite(LED_BUILTIN,LOW);//turning LED off
+    //delay(1000); //wait a second to allow the led to be turned off before going to sleep
+    sleep_cpu();//activating sleep mode
+    //Serial.println("just woke up!");//next line of code executed after the interrupt 
+    //digitalWrite(LED_BUILTIN,HIGH);//turning LED on
+ }
+}
+
+// If no activity for loseWaitMillis, display lose() and restart game
+void checkStandbyDelay() {
+  long currentMillis = millis();
+
+ if (currentMillis - lastButtonPressMillis >= loseWaitMillis) {
+    lastButtonPressMillis = millis();
+    lose();
+ }
 }
 
 void win() { //Function used if the player fails to match the sequence
@@ -301,29 +333,13 @@ void lose() { //Function used if the player fails to match the sequence
 
 void resetVars() {
   ingame = false;
+  gameChanged = false;
   seq = 0;
   memset(inputArray, 0, sizeof(inputArray));
   memset(randomArray, 0, sizeof(randomArray));
 }
 
 // ***** LED MATRIX *****
-void putByte(byte data)
-{
-  byte i = 8;
-  byte mask;
-  while (i > 0)
-  {
-    mask = 0x01 << (i - 1);        // get bitmask
-    digitalWrite( CLK_PIN, LOW);   // tick
-    if (data & mask)               // choose bit
-      digitalWrite(DIN_PIN, HIGH); // send 1
-    else
-      digitalWrite(DIN_PIN, LOW);  // send 0
-    digitalWrite(CLK_PIN, HIGH);   // tock
-    --i;                           // move to lesser bit
-  }
-}
-
 void drawInitGameMatrix() {
   Serial.println("INIT MATRIX");
   for (int l = 0; l < 8; l++) {
@@ -492,14 +508,15 @@ void buzz(unsigned int nota, long durata) {
 
 // Get btnNum from analog input. return 999 if value is not in rangre
 int getButtonNumber(int btnVal) {
+  Serial.println(btnVal);
   int btnNum = 999;
-  if (btnVal > 750 && btnVal < 770) {
+  if (btnVal > 650 && btnVal < 820) {
     btnNum = 0;
-  } else if (btnVal > 500 && btnVal < 520) {
+  } else if (btnVal > 450 && btnVal < 570) {
     btnNum = 1;
-  } else if (btnVal > 160 && btnVal < 170) {
+  } else if (btnVal > 150 && btnVal < 220) {
     btnNum = 2;
-  } else if (btnVal > 80 && btnVal < 100) {
+  } else if (btnVal > 30 && btnVal < 140) {
     btnNum = 3;
   }
 
