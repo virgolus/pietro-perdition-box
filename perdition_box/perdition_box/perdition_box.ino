@@ -5,11 +5,12 @@
 #include <avr/sleep.h>//this AVR library contains the methods that controls the sleep modes
 
 // General vars
-int games[] = {1, 2, 3};
+int games[] = {1, 2};
 int currentGameIndex = 0;
 unsigned long lastButtonPressMillis = millis();
 unsigned long standbyWaitMillis = 60000;
 unsigned long loseWaitMillis = 10000;
+static unsigned long last_interrupt_time = 0;
 int changeGamePin = 3;
 boolean ingame = false;
 boolean gameChanged = true;
@@ -62,7 +63,7 @@ void setup()
   // Change game button
     // changeGame
   pinMode(changeGamePin, INPUT_PULLUP);
-  attachInterrupt(1, gameSwitch, CHANGE); 
+  attachInterrupt(1, gameSwitch, LOW); 
 }
 
 void loop()
@@ -71,8 +72,6 @@ void loop()
     startMemoryGame();
   } else if (games[currentGameIndex] == 2) {
     startTalpaGame();
-  } else if (games[currentGameIndex] == 3) {
-    startTalpaContinuousGame();
   }
 }
 
@@ -91,7 +90,7 @@ void startMemoryGame() {
     // Generate random sequence
     int rnd = random(4);
     randomArray[y] = rnd;
-    Serial.print(randomArray[y]);
+    Serial.println(randomArray[y]);
 
     digitalWrite(ledpin[rnd], HIGH);
 
@@ -124,7 +123,6 @@ void memoryInput() { //Function for allowing user input and checking input again
       if (btnNum == 999) {
         continue;
       }
-
 
       Serial.print("button pressed: ");
       Serial.println(btnNum);
@@ -201,6 +199,7 @@ void talpaInput() { //Function for allowing user input and checking input agains
       digitalWrite(ledpin[btnNum], LOW);
 
       if ((whereIs) == btnNum) { //Checks value input by user and checks it against
+        gameChanged = false;
         break;
       } else {
         lose();
@@ -210,48 +209,13 @@ void talpaInput() { //Function for allowing user input and checking input agains
   }
 }
 
-void startTalpaContinuousGame() {
-
-  Serial.println("TALPA CONTINUOUS GAME");
-
-  ingame = true;
-
-  while (ingame) {
-    // Generate random sequence
-    int rnd = random(0, 4);
-    whereIs = rnd;
-
-    drawSmile(3 - rnd);
-    // Buzzer&notes
-    int note = notes[rnd];
-    buzz(note, 500);
-
-    int btnVal = analogRead(A0);
-
-    if (btnVal > 10)
-    { //Checking for button push
-      int btnNum = getButtonNumber(btnVal);
-
-      if (btnNum == 999) {
-        continue;
-      }
-
-      Serial.print("button pressed: ");
-      Serial.println(btnNum);
-
-      digitalWrite(ledpin[btnNum], HIGH);
-      buzz(randomNotesArray[seq], 100);
-      digitalWrite(ledpin[btnNum], LOW);
-
-      clearMatrixPart(3 - btnNum);
-    } else {
-      delay(1000);
-    }
-  }
-}
-
 void gameSwitch() {
-  Serial.println("GAME SWITCH!!!!");
+
+ unsigned long interrupt_time = millis();
+  // If interrupts come faster than 200ms, assume it's a bounce and ignore
+ if (interrupt_time - last_interrupt_time > 200)
+  {
+    Serial.println("GAME SWITCH!!!!");
     ingame = false;
     gameChanged = true;
     lastButtonPressMillis = millis();
@@ -260,6 +224,8 @@ void gameSwitch() {
     } else if (currentGameIndex == 0) {
       currentGameIndex = 1;
     }
+  }
+  last_interrupt_time = interrupt_time;
 }
 
 // TODO: If no activity for standbyWaitMillis, power off
@@ -508,7 +474,7 @@ void buzz(unsigned int nota, long durata) {
 
 // Get btnNum from analog input. return 999 if value is not in rangre
 int getButtonNumber(int btnVal) {
-  Serial.println(btnVal);
+  //Serial.println(btnVal);
   int btnNum = 999;
   if (btnVal > 650 && btnVal < 820) {
     btnNum = 0;
